@@ -60,7 +60,12 @@ if [ -z "$MQ_BUNDLE" ] || [ ! -f "$MQ_BUNDLE" ]; then
   fi
 fi
 
-cp "$MQ_BUNDLE" "$DIST/mq_js_bundle.js"
+# Avoid copying the same file onto itself when the fallback downloaded directly to $DIST
+if [ "$MQ_BUNDLE" != "$DIST/mq_js_bundle.js" ]; then
+  cp "$MQ_BUNDLE" "$DIST/mq_js_bundle.js"
+else
+  echo "mq_js_bundle.js already in $DIST; skipping copy"
+fi
 
 cp index.html "$DIST/index.html"
 
