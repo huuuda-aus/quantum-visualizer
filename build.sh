@@ -9,6 +9,21 @@ DIST=dist
 
 mkdir -p "$DIST"
 
+# Ensure rustup/cargo are available in CI environments (Netlify may not have them).
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "rustup/cargo not found — installing rustup (non-interactive)..."
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  export PATH="$HOME/.cargo/bin:$PATH"
+  # shellcheck disable=SC1090
+  source "$HOME/.cargo/env" || true
+fi
+
+# Ensure nightly toolchain is installed for the +nightly cargo invocation used below.
+if ! rustup toolchain list | grep -q "^nightly"; then
+  echo "Installing Rust nightly toolchain..."
+  rustup toolchain install nightly
+fi
+
 rustup target add "$TARGET" >/dev/null 2>&1 || true
 
 # Note: the workspace release profile enables LTO; for macroquad wasm builds this can
