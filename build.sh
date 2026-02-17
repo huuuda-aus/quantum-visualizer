@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Build telemetry (optional but recommended)
+# cargo run -p generator --release
+
+TARGET=wasm32-unknown-unknown
+DIST=dist
+
+mkdir -p "$DIST"
+
+rustup target add "$TARGET" >/dev/null 2>&1 || true
+
+# Note: the workspace release profile enables LTO; for macroquad wasm builds this can
+# trigger duplicate symbols / bitcode load failures. We explicitly disable LTO here.
+RUSTFLAGS="-C target-feature=+simd128 -C lto=no" cargo +nightly build -p quantum_dashboard --target "$TARGET" --release --bin quantum_dashboard_app
+
+WASM_IN="target/$TARGET/release/quantum_dashboard_app.wasm"
+WASM_OUT="$DIST/quantum_dashboard_app.wasm"
+cp "$WASM_IN" "$WASM_OUT"
+
+# Copy Macroquad's JS loader bundle from the Cargo registry.
+MQ_BUNDLE=$(python3 - <<'PY'
+import glob
+paths = sorted(glob.glob('/home/huuuda/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js', recursive=True))
+print(paths[-1] if paths else '')
+PY
+)
+
+if [ -z "$MQ_BUNDLE" ] || [ ! -f "$MQ_BUNDLE" ]; then
+  echo "Could not find mq_js_bundle.js in Cargo registry." >&2
+  echo "Expected under ~/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js" >&2
+  exit 1
+fi
+
+cp "$MQ_BUNDLE" "$DIST/mq_js_bundle.js"
+
+cp index.html "$DIST/index.html"
+
+if [ -f "telemetry.bin" ]; then
+  cp "telemetry.bin" "$DIST/telemetry.bin"
+else
+  echo "Warning: telemetry.bin not found in repo root (run: cargo run -p generator --release)" >&2
+fi
+
+echo "Built dist/:"
+ls -la "$DIST"
+
+echo ""
+echo "Next: ./serve.sh 8000"
+echo "Then open: http://127.0.0.1:8000/"

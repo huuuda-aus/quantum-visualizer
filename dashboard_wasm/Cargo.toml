@@ -1,0 +1,15 @@
+[package]
+name = "dashboard_wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+macroquad = "0.4"
+egui-macroquad = "0.15"
+bytemuck = { version = "1.13", features = ["derive"] }
+miniquad = "0.3"
+quad-rand = "0.2"
+wasm-bindgen = "0.2"
