@@ -34,37 +34,43 @@ WASM_IN="target/$TARGET/release/quantum_dashboard_app.wasm"
 WASM_OUT="$DIST/quantum_dashboard_app.wasm"
 cp "$WASM_IN" "$WASM_OUT"
 
-# Copy Macroquad's JS loader bundle from the Cargo registry.
-MQ_BUNDLE=$(python3 - <<'PY'
-import glob
-paths = sorted(glob.glob('/home/huuuda/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js', recursive=True))
+# Prefer a vendored macroquad JS bundle if present (no network in CI).
+VENDOR_MQ="$PWD/assets/js/mq_js_bundle.js"
+if [ -f "$VENDOR_MQ" ]; then
+  MQ_BUNDLE="$VENDOR_MQ"
+else
+  # Copy Macroquad's JS loader bundle from the Cargo registry.
+  MQ_BUNDLE=$(python3 - <<'PY'
+import glob, os
+paths = sorted(glob.glob(os.path.expanduser('~') + '/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js', recursive=True))
 print(paths[-1] if paths else '')
 PY
-)
+  )
 
-if [ -z "$MQ_BUNDLE" ] || [ ! -f "$MQ_BUNDLE" ]; then
-  echo "Could not find mq_js_bundle.js in Cargo registry; attempting to download fallback..." >&2
-  FALLBACK_URL="https://raw.githubusercontent.com/not-fl3/macroquad/master/js/mq_js_bundle.js"
-  if command -v curl >/dev/null 2>&1; then
-    echo "Downloading mq_js_bundle.js from ${FALLBACK_URL}..."
-    curl -fsSL "$FALLBACK_URL" -o "$DIST/mq_js_bundle.js" || {
-      echo "Failed to download mq_js_bundle.js from fallback URL" >&2
+  if [ -z "$MQ_BUNDLE" ] || [ ! -f "$MQ_BUNDLE" ]; then
+    echo "Could not find mq_js_bundle.js in Cargo registry; attempting to download fallback..." >&2
+    FALLBACK_URL="https://raw.githubusercontent.com/not-fl3/macroquad/master/js/mq_js_bundle.js"
+    if command -v curl >/dev/null 2>&1; then
+      echo "Downloading mq_js_bundle.js from ${FALLBACK_URL}..."
+      curl -fsSL "$FALLBACK_URL" -o "$DIST/mq_js_bundle.js" || {
+        echo "Failed to download mq_js_bundle.js from fallback URL" >&2
+        exit 1
+      }
+      echo "Downloaded mq_js_bundle.js to $DIST/mq_js_bundle.js"
+      MQ_BUNDLE="$DIST/mq_js_bundle.js"
+    else
+      echo "curl not available to download fallback mq_js_bundle.js" >&2
+      echo "Expected under ~/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js" >&2
       exit 1
-    }
-    echo "Downloaded mq_js_bundle.js to $DIST/mq_js_bundle.js"
-    MQ_BUNDLE="$DIST/mq_js_bundle.js"
-  else
-    echo "curl not available to download fallback mq_js_bundle.js" >&2
-    echo "Expected under ~/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js" >&2
-    exit 1
+    fi
   fi
-fi
 
-# Avoid copying the same file onto itself when the fallback downloaded directly to $DIST
-if [ "$MQ_BUNDLE" != "$DIST/mq_js_bundle.js" ]; then
-  cp "$MQ_BUNDLE" "$DIST/mq_js_bundle.js"
-else
-  echo "mq_js_bundle.js already in $DIST; skipping copy"
+  # Avoid copying the same file onto itself when the fallback downloaded directly to $DIST
+  if [ "$MQ_BUNDLE" != "$DIST/mq_js_bundle.js" ]; then
+    cp "$MQ_BUNDLE" "$DIST/mq_js_bundle.js"
+  else
+    echo "mq_js_bundle.js already in $DIST; skipping copy"
+  fi
 fi
 
 cp index.html "$DIST/index.html"
