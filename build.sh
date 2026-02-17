@@ -43,9 +43,21 @@ PY
 )
 
 if [ -z "$MQ_BUNDLE" ] || [ ! -f "$MQ_BUNDLE" ]; then
-  echo "Could not find mq_js_bundle.js in Cargo registry." >&2
-  echo "Expected under ~/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js" >&2
-  exit 1
+  echo "Could not find mq_js_bundle.js in Cargo registry; attempting to download fallback..." >&2
+  FALLBACK_URL="https://raw.githubusercontent.com/not-fl3/macroquad/master/js/mq_js_bundle.js"
+  if command -v curl >/dev/null 2>&1; then
+    echo "Downloading mq_js_bundle.js from ${FALLBACK_URL}..."
+    curl -fsSL "$FALLBACK_URL" -o "$DIST/mq_js_bundle.js" || {
+      echo "Failed to download mq_js_bundle.js from fallback URL" >&2
+      exit 1
+    }
+    echo "Downloaded mq_js_bundle.js to $DIST/mq_js_bundle.js"
+    MQ_BUNDLE="$DIST/mq_js_bundle.js"
+  else
+    echo "curl not available to download fallback mq_js_bundle.js" >&2
+    echo "Expected under ~/.cargo/registry/src/**/macroquad-0.4.*/js/mq_js_bundle.js" >&2
+    exit 1
+  fi
 fi
 
 cp "$MQ_BUNDLE" "$DIST/mq_js_bundle.js"
